@@ -62,6 +62,16 @@ export interface ScreeningResult {
   details?: StockResult[]
 }
 
+export interface ScreenshotRecord {
+  id: number
+  task_name: string
+  ts_code: string
+  screenshot_date: string
+  screenshot_filename: string
+  pdf_path: string | null
+  created_at: string
+}
+
 export interface StockResult {
   ts_code: string
   stock_name: string | null
@@ -77,6 +87,7 @@ export interface StockResult {
   volume_ratio: number | null
   pe_ttm: number | null
   pb: number | null
+  screenshots: ScreenshotRecord[]
 }
 
 // Schemes

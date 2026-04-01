@@ -48,3 +48,23 @@ class ScreeningResultDetail(Base):
     pb: Mapped[float | None] = mapped_column(Numeric(12, 4))
 
     result: Mapped["ScreeningResult"] = relationship("ScreeningResult", back_populates="details")
+    screenshots: Mapped[list["ScreenshotRecord"]] = relationship(
+        "ScreenshotRecord",
+        back_populates="detail",
+        cascade="all, delete-orphan",
+    )
+
+
+class ScreenshotRecord(Base):
+    __tablename__ = "screenshot_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    result_detail_id: Mapped[int] = mapped_column(Integer, ForeignKey("screening_result_detail.id", ondelete="CASCADE"), nullable=False)
+    task_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ts_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    screenshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    screenshot_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    pdf_path: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    detail: Mapped["ScreeningResultDetail"] = relationship("ScreeningResultDetail", back_populates="screenshots")

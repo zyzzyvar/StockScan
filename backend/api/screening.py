@@ -1,11 +1,11 @@
 from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import text
 from ..database import get_db, get_stockdb
-from ..models import Scheme, ScreeningResult, ScreeningResultDetail
+from ..models import Scheme, ScreeningResult, ScreeningResultDetail, ScreenshotRecord
 from ..schemas.screening import (
-    ScreeningRunRequest, ScreeningResultOut, ScreeningResultDetailOut, StockResultOut
+    ScreeningRunRequest, ScreeningResultOut, ScreeningResultDetailOut, StockResultOut, ScreenshotRecordOut
 )
 from ..engine.executor import run_screening
 
@@ -51,7 +51,9 @@ def list_results(scheme_id: int | None = None, limit: int = 20, db: Session = De
 
 @router.get("/results/{result_id}", response_model=ScreeningResultDetailOut)
 def get_result(result_id: int, db: Session = Depends(get_db)):
-    result = db.get(ScreeningResult, result_id)
+    result = db.query(ScreeningResult).options(
+        selectinload(ScreeningResult.details).selectinload(ScreeningResultDetail.screenshots)
+    ).filter_by(id=result_id).first()
     if not result:
         raise HTTPException(404, "Result not found")
     return _build_detail_response(result)
@@ -165,6 +167,18 @@ def _build_detail_response(result: ScreeningResult) -> ScreeningResultDetailOut:
             volume_ratio=float(d.volume_ratio) if d.volume_ratio is not None else None,
             pe_ttm=float(d.pe_ttm) if d.pe_ttm is not None else None,
             pb=float(d.pb) if d.pb is not None else None,
+            screenshots=[
+                ScreenshotRecordOut(
+                    id=sr.id,
+                    task_name=sr.task_name,
+                    ts_code=sr.ts_code,
+                    screenshot_date=sr.screenshot_date,
+                    screenshot_filename=sr.screenshot_filename,
+                    pdf_path=sr.pdf_path,
+                    created_at=sr.created_at,
+                )
+                for sr in d.screenshots
+            ],
         )
         for d in result.details
     ]

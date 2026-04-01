@@ -13,7 +13,19 @@ class RuleResultOut(BaseModel):
     matched: bool
 
 
+class ScreenshotRecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    task_name: str
+    ts_code: str
+    screenshot_date: date
+    screenshot_filename: str
+    pdf_path: str | None = None
+    created_at: datetime
+
+
 class StockResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     ts_code: str
     stock_name: str | None
     matched_rules: int
@@ -28,6 +40,7 @@ class StockResultOut(BaseModel):
     volume_ratio: float | None = None
     pe_ttm: float | None = None
     pb: float | None = None
+    screenshots: list[ScreenshotRecordOut] = []
 
 
 class ScreeningResultOut(BaseModel):

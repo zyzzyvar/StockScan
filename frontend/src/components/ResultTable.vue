@@ -180,6 +180,32 @@ async function copyToClipboard() {
         </template>
       </el-table-column>
 
+      <!-- 截图 -->
+      <el-table-column label="截图" min-width="100" fixed>
+        <template #default="{ row }">
+          <el-popover v-if="row.screenshots?.length" placement="right" :width="400" trigger="click">
+            <template #reference>
+              <el-tag type="info" size="small" style="cursor:pointer">{{ row.screenshots.length }} 张</el-tag>
+            </template>
+            <div style="font-size:12px">
+              <div
+                v-for="(sr, idx) in row.screenshots" :key="sr.id"
+                style="padding:6px 0; border-bottom:1px solid #f0f0f0; display:flex; flex-direction:column; gap:3px"
+              >
+                <div style="font-weight:500; color:#303133">{{ sr.task_name }}</div>
+                <div style="color:#606266">
+                  <span>📅 {{ sr.screenshot_date }}</span>
+                  <span style="margin-left:8px">⏰ {{ sr.created_at?.slice(11, 19) ?? '-' }}</span>
+                </div>
+                <div style="color:#909399; font-family:monospace; word-break:break-all">{{ sr.screenshot_filename }}</div>
+                <div v-if="sr.pdf_path" style="color:#909399; font-family:monospace; word-break:break-all">📄 {{ sr.pdf_path }}</div>
+              </div>
+            </div>
+          </el-popover>
+          <el-tag v-else type="info" size="small" disabled>无</el-tag>
+        </template>
+      </el-table-column>
+
       <!-- 选股日行情 -->
       <el-table-column prop="close" label="收盘价" min-width="90" sortable>
         <template #default="{ row }">{{ row.close?.toFixed(2) ?? '-' }}</template>
