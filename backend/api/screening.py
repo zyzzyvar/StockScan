@@ -5,7 +5,8 @@ from sqlalchemy import text
 from ..database import get_db, get_stockdb
 from ..models import Scheme, ScreeningResult, ScreeningResultDetail, ScreenshotRecord
 from ..schemas.screening import (
-    ScreeningRunRequest, ScreeningResultOut, ScreeningResultDetailOut, StockResultOut, ScreenshotRecordOut
+    ScreeningRunRequest, ScreeningResultOut, ScreeningResultDetailOut, StockResultOut, ScreenshotRecordOut,
+    ScreenshotRecordCreateRequest
 )
 from ..engine.executor import run_screening
 
@@ -148,6 +149,77 @@ def get_forward_performance(
         }
 
     return {"forward_dates": forward_dates, "stocks": stocks, "summary": summary}
+
+
+@router.post("/screenshots")
+def save_screenshot(body: ScreenshotRecordCreateRequest, db: Session = Depends(get_db)):
+    """
+    外部应用（如 StockView）调用此接口保存截图记录。
+
+    请求体示例：
+    {
+        "task_name": "低位蓄势主升浪捕捉2",
+        "ts_code": "000550.SZ",
+        "trade_date": "2026-04-01",
+        "screenshot_filename": "/path/to/screenshot.png",
+        "pdf_path": "/path/to/pdf.pdf"
+    }
+
+    返回：
+    {
+        "id": 123,
+        "message": "Screenshot record saved successfully"
+    }
+    """
+
+    # Step 1: 查询对应的 result_detail_id
+    result_detail = db.query(ScreeningResultDetail).filter(
+        ScreeningResultDetail.ts_code == body.ts_code
+    ).join(
+        ScreeningResult, ScreeningResult.id == ScreeningResultDetail.result_id
+    ).join(
+        Scheme, Scheme.id == ScreeningResult.scheme_id
+    ).filter(
+        Scheme.name == body.task_name,
+        ScreeningResult.trade_date == body.trade_date
+    ).first()
+
+    if not result_detail:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Screening result not found: scheme='{body.task_name}', stock='{body.ts_code}', date={body.trade_date}. "
+                   f"Please ensure the screening has been run and found this stock."
+        )
+
+    # Step 2: 创建截图记录
+    try:
+        screenshot = ScreenshotRecord(
+            result_detail_id=result_detail.id,
+            task_name=body.task_name,
+            ts_code=body.ts_code,
+            screenshot_date=body.trade_date,
+            screenshot_filename=body.screenshot_filename,
+            pdf_path=body.pdf_path
+        )
+        db.add(screenshot)
+        db.commit()
+        db.refresh(screenshot)
+
+        return {
+            "id": screenshot.id,
+            "message": "Screenshot record saved successfully",
+            "result_detail_id": result_detail.id
+        }
+    except Exception as e:
+        db.rollback()
+        if "unique constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate record: A screenshot record for this combination (scheme, stock, date) already exists. "
+                       f"Please use a different date or delete the existing record."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 def _build_detail_response(result: ScreeningResult) -> ScreeningResultDetailOut:

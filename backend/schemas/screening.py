@@ -1,10 +1,18 @@
 from datetime import date, datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScreeningRunRequest(BaseModel):
     scheme_id: int
     trade_date: date
+
+
+class ScreenshotRecordCreateRequest(BaseModel):
+    task_name: str = Field(..., description="选股方案名称")
+    ts_code: str = Field(..., description="股票代码（如600000.SH）")
+    trade_date: date = Field(..., description="选股交易日期")
+    screenshot_filename: str = Field(..., description="截图文件路径或名称")
+    pdf_path: str | None = Field(None, description="PDF 文件路径（可选）")
 
 
 class RuleResultOut(BaseModel):
