@@ -255,3 +255,56 @@ PostgreSQL 服务器 (192.168.99.150) 的 `pg_hba.conf` 缺少允许远端 IP (1
 
 用户要求直接修改，但 SSH 认证失败（权限/密码问题），需要：
 - SSH 私钥路径、PostgreSQL 数据目录路径、或 root 密码
+
+---
+
+## Session 6（2026-04-01）
+
+### Q: StockView 截图集成 — 创建 screenshot_records 表，前端展示截图记录
+
+**用户提问：**
+> StockView（截图工具）需要在本地保存截图的同时，向 StockScan 库中记录元数据，便于后续查询关联。
+> 截图元数据包括：结果关联、任务名、股票代码、截图日期、文件名等。
+> 核心需求：建表 → 提供查询 API → 前端能展示记录（文件名、日期等元数据，不展示实际图片）
+
+**核心结论：**
+完整的截图记录集成改造，分为 7 步逐步实施：
+
+**1. Alembic 迁移（`9dccd3ccca38`）**
+- 创建 `screenshot_records` 表，含 8 字段 + 3 索引 + 唯一约束
+- 外键：result_detail_id → screening_result_detail(id) CASCADE
+- 唯一约束：(result_detail_id, task_name, screenshot_date)
+
+**2. SQLAlchemy 模型**
+- `ScreenshotRecord` 类，关联 `ScreeningResultDetail.screenshots`
+- 自动跟踪 created_at，反向关联支持级联删除
+
+**3. Pydantic Schema**
+- `ScreenshotRecordOut`：序列化截图记录（id, task_name, ts_code, screenshot_date, screenshot_filename, pdf_path, created_at）
+- 扩展 `StockResultOut`：添加 `screenshots: list[ScreenshotRecordOut] = []`
+
+**4. 后端 API 修改**
+- GET `/api/screening/results/{id}` 使用 `selectinload` 显式加载 screenshots 关系
+- `_build_detail_response()` 在构建 StockResultOut 时动态序列化 screenshots 列表
+
+**5. 前端 API 类型**
+- 添加 `ScreenshotRecord` 接口（7 字段）
+- 更新 `StockResult` 接口：添加 `screenshots: ScreenshotRecord[]`
+
+**6. 前端 UI 组件**
+- ResultTable.vue：新增"截图"列（在"匹配"列之后）
+- 展示逻辑：
+  * 有截图：显示蓝色标签 "$数字 张"，点击弹窗展示列表
+  * 无截图：显示灰色禁用标签"无"
+- 弹窗内容：任务名 / 日期+时间 / 文件名 / PDF路径（若存在）
+
+**7. 验证与测试**
+- 数据库插入测试记录：screenshot_records 写入成功，关系正确
+- API 查询验证：eager-load selectinload 工作，返回完整数据
+- 前端展示验证：截图列正确显示，popover 内容完整
+
+**改造成果**
+- Commit: `998739d` Integrate StockView screenshot recording system
+- StockView 可直接向 screenshot_records 表 INSERT 元数据
+- StockScan 历史选股记录页面可立即查看并展示所有相关截图
+- 支持多任务、多截图关联，唯一约束防重复
